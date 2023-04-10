@@ -1,1 +1,3 @@
-# Eroveic-Eric_jing_json_study
+# C++学习JSON
+Erick_jing
+2023/4/10
