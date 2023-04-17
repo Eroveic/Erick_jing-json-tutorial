@@ -6,7 +6,7 @@
 typedef enum { LEPT_NULL, LEPT_FALSE, LEPT_TRUE, LEPT_NUMBER, LEPT_STRING, LEPT_ARRAY, LEPT_OBJECT } lept_type;
 
 typedef struct {
-    union {
+    union {//共用体，一时只能用一个成员，节省内存空间
         struct { char* s; size_t len; }s;  /* string: null-terminated string, string length */
         double n;                          /* number */
     }u;

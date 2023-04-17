@@ -1,3 +1,8 @@
+#ifdef _WINDOWS
+#define _CRTDBG_MAP_ALLOC
+#include <crtdbg.h>
+#endif
+
 #include "leptjson.h"
 #include <assert.h>  /* assert() */
 #include <errno.h>   /* errno, ERANGE */
@@ -9,6 +14,7 @@
 #define LEPT_PARSE_STACK_INIT_SIZE 256
 #endif
 
+/*do while(0)必定会执行一次*/
 #define EXPECT(c, ch)       do { assert(*c->json == (ch)); c->json++; } while(0)
 #define ISDIGIT(ch)         ((ch) >= '0' && (ch) <= '9')
 #define ISDIGIT1TO9(ch)     ((ch) >= '1' && (ch) <= '9')
@@ -17,7 +23,7 @@
 typedef struct {
     const char* json;
     char* stack;
-    size_t size, top;
+    size_t size, top;//size是当前栈的容量
 }lept_context;
 
 static void* lept_context_push(lept_context* c, size_t size) {
@@ -30,8 +36,9 @@ static void* lept_context_push(lept_context* c, size_t size) {
             c->size += c->size >> 1;  /* c->size * 1.5 */
         c->stack = (char*)realloc(c->stack, c->size);
     }
-    ret = c->stack + c->top;
+    ret = c->stack + c->top;//这个用法挺特别，不明白什么个原理
     c->top += size;
+    //printf("ret address: %p\n", ret);
     return ret;
 }
 
@@ -102,6 +109,31 @@ static int lept_parse_string(lept_context* c, lept_value* v) {
             case '\0':
                 c->top = head;
                 return LEPT_PARSE_MISS_QUOTATION_MARK;
+            case '\\':    // '\\'代表一个'\'
+                /*
+                    \' 表示单引号
+                    \" 表示双引号
+                    \\ 表示反斜杠
+                    \n 表示换行
+                    \r 表示回车
+                    \t 表示制表符
+                    \b 表示退格符
+                    \f 表示换页符
+                */
+                switch (*p++) {
+                    case '\'': PUTC(c, '\''); break;
+                    case '\"': PUTC(c, '\"'); break;
+                    case '\\': PUTC(c, '\\'); break;
+                    case '\n': PUTC(c, '\n'); break;
+                    case '\r': PUTC(c, '\r'); break;
+                    case '\t': PUTC(c, '\t'); break;
+                    case '\b': PUTC(c, '\b'); break;
+                    case '\f': PUTC(c, '\f'); break;
+                    default:
+                        c->top = head;
+                        return LEPT_PARSE_MISS_QUOTATION_MARK;
+                }
+
             default:
                 PUTC(c, ch);
         }
@@ -154,11 +186,14 @@ lept_type lept_get_type(const lept_value* v) {
 
 int lept_get_boolean(const lept_value* v) {
     /* \TODO */
-    return 0;
+    assert(v !=NULL && (v->type == LEPT_TRUE || v->type==LEPT_FALSE));
+    return v->type == LEPT_TRUE;//???为啥要返回这个值，难道是必为true
 }
 
 void lept_set_boolean(lept_value* v, int b) {
     /* \TODO */
+    lept_free(v);
+    v->type = b ? LEPT_TRUE : LEPT_FALSE;
 }
 
 double lept_get_number(const lept_value* v) {
@@ -168,6 +203,9 @@ double lept_get_number(const lept_value* v) {
 
 void lept_set_number(lept_value* v, double n) {
     /* \TODO */
+    lept_free(v);
+    v->u.n = n;
+    v->type = LEPT_NUMBER;
 }
 
 const char* lept_get_string(const lept_value* v) {
