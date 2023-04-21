@@ -18,6 +18,7 @@
 
 ### 2023/4/21完成test4
 
-test4是我花费时间比较多的地方，这里的**unicode**和*utf-8*编码花了我非常多的时间，大体上明白了这两个东西。这里有个大佬讲解的比较的详细 
+test4是我花费时间比较多的地方，这里的**unicode**和*utf-8*编码花了我非常多的时间，大体上明白了这两个东西。这里有个大佬讲解的比较的详细 [字符编码笔记：ASCII，Unicode 和 UTF-8](https://www.ruanyifeng.com/blog/2007/10/ascii_unicode_and_utf-8.html)，并且这里也学习到了这种unicode和utf-8的转换的方法，确实让我眼前一亮，大开眼界，这里是通过把字符的码点转化成utf-8，这里主要要了解utf-8编码的形式，让后才能根据这个去转换。
 
-[字符编码笔记：ASCII，Unicode 和 UTF-8]: https://www.ruanyifeng.com/blog/2007/10/ascii_unicode_and_utf-8.html	"字符编码笔记：ASCII，Unicode 和 UTF-8"
+utf-8的字节是1-4，就是根据字符的码点的字节数来分类，然后转换。
+
