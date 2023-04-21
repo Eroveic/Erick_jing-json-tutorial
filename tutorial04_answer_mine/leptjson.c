@@ -1,4 +1,4 @@
-#ifdef _WINDOWS
+﻿#ifdef _WINDOWS
 #define _CRTDBG_MAP_ALLOC
 #include <crtdbg.h>
 #endif
@@ -92,18 +92,50 @@ static int lept_parse_number(lept_context* c, lept_value* v) {
 
 static const char* lept_parse_hex4(const char* p, unsigned* u) {
     /* \TODO */
+    *u = 0;
+    for (int i = 0; i < 4; i++) {
+        *u <<= 4;//左移4位
+        char ch = *p++;
+        if (ch >= '0' && ch <= '9') *u |= ch - '0';//计算是数字0-9
+        else if (ch >= 'A' && ch <= 'F') *u |= ch - ('A' - 10);//得到A-F的十六进制数
+        else if (ch >= 'a' && ch <= 'f') *u |= ch - ('a' - 10);
+        else
+            return NULL;
+    }
     return p;
 }
 
 static void lept_encode_utf8(lept_context* c, unsigned u) {
     /* \TODO */
+
+    /*这里是有几个x那么就要右移多少位,6个为一个基数，右移只是为了和x相对，把u所对应的数填上去*/
+    if (u <= 0x007F)//1个字节
+        /*这里设计的非常的巧妙，u最大为01111111，第一位必为0,所有不需要右移7位*/
+        PUTC(c, u & 0x00FF);
+    else if (u >= 0x0080 && u <= 0x07FF) {//2个字节
+        PUTC(c, 0x00C0 | ((u >> 6) & 0x00FF));
+        PUTC(c, 0x0080 | (u & 0x003F));
+    }
+    else if (u >= 0x0800 && u <= 0xFFFF) {//3个字节
+        PUTC(c, 0x00E0 | ((u >> 12) & 0x00FF));
+        PUTC(c, 0x0080 | ((u >> 6) & 0x003F));
+        PUTC(c, 0x0080 | (u & 0x003F));
+    }
+    else {//4个字节
+        assert(u <= 0x10FFFF);
+        PUTC(c, 0x00F0 | ((u >> 18) & 0x00FF));
+        PUTC(c, 0x0080 | ((u >> 12) & 0x003F));
+        PUTC(c, 0x0080 | ((u >> 6) & 0x003F));
+        PUTC(c, 0x0080 | (u & 0x003F));
+
+    }
 }
 
 #define STRING_ERROR(ret) do { c->top = head; return ret; } while(0)
 
 static int lept_parse_string(lept_context* c, lept_value* v) {
     size_t head = c->top, len;
-    unsigned u;
+    unsigned u,u2;
     const char* p;
     EXPECT(c, '\"');
     p = c->json;
@@ -126,8 +158,25 @@ static int lept_parse_string(lept_context* c, lept_value* v) {
                     case 'r':  PUTC(c, '\r'); break;
                     case 't':  PUTC(c, '\t'); break;
                     case 'u':
+                        /*
+                        高代理项(H)：0xD800 + ((U - 0x10000) >> 10)
+                        低代理项(L)：0xDC00 + (U & 0x3FF)
+                        codepoint(U) = 0x10000 + (H − 0xD800) × 0x400 + (L − 0xDC00)
+                        高位代理项和低位代理项会分别映射为0xD800至0xDBFF和0xDC00至0xDFFF的码位
+                        */
                         if (!(p = lept_parse_hex4(p, &u)))
                             STRING_ERROR(LEPT_PARSE_INVALID_UNICODE_HEX);
+                        if (u >= 0xD800 && u <= 0xDBFF) {
+                            if (*p++ != '\\')
+                                STRING_ERROR(LEPT_PARSE_INVALID_UNICODE_SURROGATE);
+                            if(*p++!='u')
+                                STRING_ERROR(LEPT_PARSE_INVALID_UNICODE_SURROGATE);
+                            if(!(p=lept_parse_hex4(p,&u2)))
+                                STRING_ERROR(LEPT_PARSE_INVALID_UNICODE_HEX);
+                            if(u2 < 0xD800 || u2 > 0xDFFF)
+                                STRING_ERROR(LEPT_PARSE_INVALID_UNICODE_SURROGATE);
+                            u = (((u - 0xD800) << 10) | (u2 - 0xDC00)) + 0x10000;
+                        }
                         /* \TODO surrogate handling */
                         lept_encode_utf8(c, u);
                         break;
